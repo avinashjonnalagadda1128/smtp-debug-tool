@@ -1,6 +1,7 @@
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
 using System;
-using System.Net;
-using System.Net.Mail;
 using System.Windows.Forms;
 
 namespace SmtpDebugTool
@@ -26,39 +27,65 @@ namespace SmtpDebugTool
                 string toEmail = txtTo.Text.Trim();
                 string subject = txtSubject.Text.Trim();
                 string body = txtBody.Text.Trim();
+                bool useTls = chkEnableTls.Checked;
 
-                SmtpClient client = new SmtpClient(smtpServer, port)
+                var message = new MimeMessage();
+                message.From.Add(MailboxAddress.Parse(fromEmail));
+                message.To.Add(MailboxAddress.Parse(toEmail));
+                message.Subject = subject;
+                message.Body = new TextPart("plain") { Text = body };
+
+                // ✅ Use logger directly in constructor
+                using (var logger = new TextBoxProtocolLogger(txtLog))
+                using (var client = new SmtpClient(new TextBoxProtocolLogger(txtLog)))  // ✅ This is the only valid way to use ProtocolLogger
                 {
-                    EnableSsl = true,
-                    Credentials = new NetworkCredential(username, password),
-                    DeliveryMethod = SmtpDeliveryMethod.Network,
-                    Timeout = 10000 // 10 seconds
-                };
+                    client.Connect(smtpServer, port,
+                        useTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None);
 
-                MailMessage mail = new MailMessage(fromEmail, toEmail, subject, body);
-                client.Send(mail);
-
-                txtLog.AppendText("✅ Email sent successfully.\r\n");
-            }
-            catch (SmtpException ex)
-            {
-                txtLog.AppendText($"❌ SMTP Error: {ex.StatusCode}\r\n");
-                txtLog.AppendText($"Message: {ex.Message}\r\n");
-
-                // Optional: Add detailed meaning for common SMTP error codes
-                if (ex.StatusCode == SmtpStatusCode.MailboxUnavailable)
-                {
-                    txtLog.AppendText("Explanation: Mailbox unavailable (wrong recipient address?)\r\n");
+                    client.Authenticate(username, password);
+                    client.Send(message);
+                    client.Disconnect(true);
                 }
-                else if (ex.StatusCode == SmtpStatusCode.GeneralFailure)
-                {
-                    txtLog.AppendText("Explanation: Could not connect to server (check server, port, or internet)\r\n");
-                }
+
+                txtLog.AppendText("\r\n✅ Email sent successfully using MailKit.\r\n");
             }
-            catch (Exception ex)
-            {
-                txtLog.AppendText($"❌ General Error: {ex.Message}\r\n");
-            }
+            catch (MailKit.Security.AuthenticationException ex)
+{
+    txtLog.AppendText($"\r\n❌ Authentication Error: {ex.Message}\r\n");
+    txtLog.AppendText("Explanation: The server refused authentication. This could mean STARTTLS is required or your credentials are wrong.\r\n");
+}
+catch (MailKit.CommandException ex)
+{
+    txtLog.AppendText($"\r\n❌ Command Error: {ex.Message}\r\n");
+
+    if (ex.Message.Contains("STARTTLS", StringComparison.OrdinalIgnoreCase))
+    {
+        txtLog.AppendText("Explanation: STARTTLS is required by the server, but it was not enabled.\r\n");
+    }
+    else
+    {
+        txtLog.AppendText("Explanation: SMTP server command rejected. Check the SMTP flow and protocol log.\r\n");
+    }
+}
+catch (Exception ex)
+{
+    txtLog.AppendText($"\r\n❌ General Error: {ex.Message}\r\n");
+
+    if (ex.Message.Contains("does not support authentication", StringComparison.OrdinalIgnoreCase))
+    {
+        txtLog.AppendText("Explanation: The server likely requires STARTTLS before authentication. Try enabling TLS.\r\n");
+    }
+    else if (ex.Message.Contains("STARTTLS", StringComparison.OrdinalIgnoreCase))
+    {
+        txtLog.AppendText("Explanation: The server requires STARTTLS to proceed. Please enable TLS.\r\n");
+    }
+    else
+    {
+        txtLog.AppendText("Explanation: An unexpected error occurred. Check your SMTP settings and log.\r\n");
+    }
+}
+
+
         }
     }
 }

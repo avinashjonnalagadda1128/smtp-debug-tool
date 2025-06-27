@@ -13,6 +13,8 @@
         private System.Windows.Forms.TextBox txtBody;
         private System.Windows.Forms.Button btnSend;
         private System.Windows.Forms.TextBox txtLog;
+        private System.Windows.Forms.CheckBox chkEnableTls;
+
 
         protected override void Dispose(bool disposing)
         {
@@ -60,6 +62,16 @@
             this.txtTo.PlaceholderText = "To Email";
             this.txtSubject.PlaceholderText = "Subject";
             this.txtBody.PlaceholderText = "Email Body";
+
+            this.chkEnableTls = new System.Windows.Forms.CheckBox();
+this.chkEnableTls.AutoSize = true;
+this.chkEnableTls.Location = new System.Drawing.Point(120, 260); // adjust Y for layout
+this.chkEnableTls.Name = "chkEnableTls";
+this.chkEnableTls.Size = new System.Drawing.Size(120, 20);
+this.chkEnableTls.Text = "Enable TLS (SSL)";
+this.chkEnableTls.UseVisualStyleBackColor = true;
+this.Controls.Add(this.chkEnableTls);
+
 
             this.btnSend.Text = "Send Email";
             this.btnSend.Click += new System.EventHandler(this.btnSend_Click);
